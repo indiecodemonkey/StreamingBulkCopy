@@ -7,6 +7,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamingBulkCopy", "Stream
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamingBulkCopy.ConsoleClient", "StreamingBulkCopy.ConsoleClient\StreamingBulkCopy.ConsoleClient.csproj", "{DB2115A0-5307-48EF-BF2E-4B608C03E6AD}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{28CA7B2C-D5DF-4742-9B21-73AB7D3AE4BB}"
+	ProjectSection(SolutionItems) = preProject
+		readme.txt = readme.txt
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

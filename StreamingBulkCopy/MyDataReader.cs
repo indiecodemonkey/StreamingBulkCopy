@@ -14,7 +14,6 @@ namespace StreamingBulkCopy
 
         public MyDataReader()
         {
-            //Stream = new StreamReader(fileName);
             Stream = new StreamReader( "D:\\Projects\\StreamingBulkCopy\\1000000_KitList.csv");
             Values = new object[this.FieldCount];
         }
