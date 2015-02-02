@@ -1,74 +1,86 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 
 namespace StreamingBulkCopy
 {
-    /// <summary>
-    /// IDataReader that can be used for "reading" an IEnumerable<T> collection
-    /// </summary>
     public class EnumerableDataReader<T> : IDataReader
     {
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="collection">The collection to be read</param>
-        /// <param name="fields">The list of public field/properties to read from each T (in order), OR if no fields are given only one field will be available: T itself</param>
+        private IEnumerator<T> enumerator;
+        private T current;
+        private bool enumeratorState;
+        private readonly List<BaseField> baseFields = new List<BaseField>();
+
         public EnumerableDataReader(IEnumerable<T> collection, params string[] fields)
         {
             if (collection == null)
                 throw new ArgumentNullException("collection");
 
-            m_Enumerator = collection.GetEnumerator();
+            enumerator = collection.GetEnumerator();
 
-            if (m_Enumerator == null)
+            if (enumerator == null)
                 throw new NullReferenceException("collection does not implement GetEnumerator");
 
             SetFields(fields);
         }
 
-        private IEnumerator<T> m_Enumerator;
-        private T m_Current = default(T);
-        private bool m_EnumeratorState = false;
+        public EnumerableDataReader(IEnumerable<T> collection)
+        {
+            if (collection == null)
+                throw new ArgumentNullException("collection");
+
+            enumerator = collection.GetEnumerator();
+
+            if (enumerator == null)
+                throw new NullReferenceException("collection does not implement GetEnumerator");
+
+            //we call this to forward the current enumerator 1 row past the headers row, so the headers are not imported
+            enumeratorState = enumerator.MoveNext();
+
+            var typeInfo = typeof(T).GetTypeInfo();
+            var propertyInfoList = typeInfo.DeclaredProperties;
+            var fieldNames = propertyInfoList.Select(propertyInfo => propertyInfo.Name).ToList();
+
+            SetFields(fieldNames);
+        }
 
         private void SetFields(ICollection<string> fields)
         {
             if (fields.Count > 0)
             {
-                Type type = typeof(T);
-                foreach (string field in fields)
+                var type = typeof(T);
+                foreach (var field in fields)
                 {
-                    PropertyInfo pInfo = type.GetProperty(field);
-                    if (pInfo != null)
-                        m_Fields.Add(new Property(pInfo));
+                    var properyInfo = type.GetProperty(field);
+                    if (properyInfo != null)
+                        this.baseFields.Add(new Property(properyInfo));
                     else
                     {
-                        FieldInfo fInfo = type.GetField(field);
-                        if (fInfo != null)
-                            m_Fields.Add(new Field(fInfo));
+                        var fieldInfo = type.GetField(field);
+                        if (fieldInfo != null)
+                            this.baseFields.Add(new Field(fieldInfo));
                         else
                             throw new NullReferenceException(string.Format("EnumerableDataReader<T>: Missing property or field '{0}' in Type '{1}'.", field, type.Name));
                     }
                 }
             }
             else
-                m_Fields.Add(new Self());
+                this.baseFields.Add(new Self());
         }
-
-        private readonly List<BaseField> m_Fields = new List<BaseField>();
 
         #region IDisposable Members
 
         public void Dispose()
         {
-            if (m_Enumerator != null)
+            if (enumerator != null)
             {
-                m_Enumerator.Dispose();
-                m_Enumerator = null;
-                m_Current = default(T);
-                m_EnumeratorState = false;
+                enumerator.Dispose();
+                enumerator = null;
+                current = default(T);
+                enumeratorState = false;
             }
             m_Closed = true;
         }
@@ -92,7 +104,7 @@ namespace StreamingBulkCopy
         public DataTable GetSchemaTable()
         {
             var dt = new DataTable();
-            foreach (BaseField field in m_Fields)
+            foreach (var field in baseFields)
             {
                 dt.Columns.Add(new DataColumn(field.Name, field.Type));
             }
@@ -113,9 +125,9 @@ namespace StreamingBulkCopy
         {
             if (IsClosed)
                 throw new InvalidOperationException("DataReader is closed");
-            m_EnumeratorState = m_Enumerator.MoveNext();
-            m_Current = m_EnumeratorState ? m_Enumerator.Current : default(T);
-            return m_EnumeratorState;
+            enumeratorState = enumerator.MoveNext();
+            current = enumeratorState ? enumerator.Current : default(T);
+            return enumeratorState;
         }
 
         public int RecordsAffected
@@ -129,14 +141,14 @@ namespace StreamingBulkCopy
 
         public int FieldCount
         {
-            get { return m_Fields.Count; }
+            get { return baseFields.Count; }
         }
 
         public Type GetFieldType(int i)
         {
-            if (i < 0 || i >= m_Fields.Count)
+            if (i < 0 || i >= baseFields.Count)
                 throw new IndexOutOfRangeException();
-            return m_Fields[i].Type;
+            return baseFields[i].Type;
         }
 
         public string GetDataTypeName(int i)
@@ -146,15 +158,15 @@ namespace StreamingBulkCopy
 
         public string GetName(int i)
         {
-            if (i < 0 || i >= m_Fields.Count)
+            if (i < 0 || i >= baseFields.Count)
                 throw new IndexOutOfRangeException();
-            return m_Fields[i].Name;
+            return baseFields[i].Name;
         }
 
         public int GetOrdinal(string name)
         {
-            for (int i = 0; i < m_Fields.Count; i++)
-                if (m_Fields[i].Name == name)
+            for (int i = 0; i < baseFields.Count; i++)
+                if (baseFields[i].Name == name)
                     return i;
             throw new IndexOutOfRangeException("name");
         }
@@ -176,16 +188,16 @@ namespace StreamingBulkCopy
 
         public object GetValue(int i)
         {
-            if (IsClosed || !m_EnumeratorState)
+            if (IsClosed || !enumeratorState)
                 throw new InvalidOperationException("DataReader is closed or has reached the end of the enumerator");
-            if (i < 0 || i >= m_Fields.Count)
+            if (i < 0 || i >= baseFields.Count)
                 throw new IndexOutOfRangeException();
-            return m_Fields[i].GetValue(m_Current);
+            return baseFields[i].GetValue(current);
         }
 
         public int GetValues(object[] values)
         {
-            int length = Math.Min(m_Fields.Count, values.Length);
+            int length = Math.Min(baseFields.Count, values.Length);
             for (int i = 0; i < length; i++)
                 values[i] = GetValue(i);
             return length;
@@ -294,29 +306,29 @@ namespace StreamingBulkCopy
 
         private class Property : BaseField
         {
+            private readonly PropertyInfo propertyInfo;
+            private readonly Func<T, object> dynamicGetter;
+
             public Property(PropertyInfo info)
             {
-                m_Info = info;
-                m_DynamicGetter = CreateGetMethod(info);
+                propertyInfo = info;
+                dynamicGetter = CreateGetMethod(info);
             }
-
-            private PropertyInfo m_Info;
-            private Func<T, object> m_DynamicGetter;
 
             public override Type Type
             {
-                get { return m_Info.PropertyType; }
+                get { return propertyInfo.PropertyType; }
             }
 
             public override string Name
             {
-                get { return m_Info.Name; }
+                get { return propertyInfo.Name; }
             }
 
             public override object GetValue(T instance)
             {
                 //return m_Info.GetValue(instance, null); // Reflection is slow
-                return m_DynamicGetter(instance);
+                return dynamicGetter(instance);
             }
 
             // Create dynamic method for faster access instead via reflection
@@ -339,29 +351,29 @@ namespace StreamingBulkCopy
 
         private class Field : BaseField
         {
+            private readonly FieldInfo fieldInfo;
+            private readonly Func<T, object> dynamicGetter;
+
             public Field(FieldInfo info)
             {
-                m_Info = info;
-                m_DynamicGetter = CreateGetMethod(info);
+                fieldInfo = info;
+                dynamicGetter = CreateGetMethod(info);
             }
-
-            private FieldInfo m_Info;
-            private Func<T, object> m_DynamicGetter;
 
             public override Type Type
             {
-                get { return m_Info.FieldType; }
+                get { return fieldInfo.FieldType; }
             }
 
             public override string Name
             {
-                get { return m_Info.Name; }
+                get { return fieldInfo.Name; }
             }
 
             public override object GetValue(T instance)
             {
                 //return m_Info.GetValue(instance); // Reflection is slow
-                return m_DynamicGetter(instance);
+                return dynamicGetter(instance);
             }
 
             // Create dynamic method for faster access instead via reflection
@@ -384,16 +396,16 @@ namespace StreamingBulkCopy
 
         private class Self : BaseField
         {
+            private readonly Type type;
+
             public Self()
             {
-                m_Type = typeof(T);
+                type = typeof(T);
             }
-
-            private Type m_Type;
 
             public override Type Type
             {
-                get { return m_Type; }
+                get { return type; }
             }
 
             public override string Name

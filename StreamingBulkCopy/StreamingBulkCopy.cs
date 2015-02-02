@@ -8,12 +8,19 @@ namespace StreamingBulkCopy
 {
     public class StreamingBulkCopy
     {
-        public static IEnumerable<Kit> GetKits()
+        private readonly string importFile;
+
+        public StreamingBulkCopy(string importFile)
+        {
+            this.importFile = importFile;
+        }
+
+        public IEnumerable<Kit> GetKits()
         {
             //stream the file out first using LINQ
             //this method reads one line at a time, and returns an IEnumerable of string
             //it only every loads one line into memory at a time
-            return File.ReadLines("D:\\Projects\\StreamingBulkCopy\\1000000_KitList.csv")
+            return File.ReadLines(importFile)
                 .Select(line => line.Split(','))
                 .Select(split => new Kit
                 {
@@ -33,12 +40,5 @@ namespace StreamingBulkCopy
             }
         }
     }
-
-    //DTO
-    public class Kit
-    {
-        public string Sequence { get; set; }
-        public string KitNumber { get; set; }
-        public string KitType { get; set; }
-    }
 }
+
