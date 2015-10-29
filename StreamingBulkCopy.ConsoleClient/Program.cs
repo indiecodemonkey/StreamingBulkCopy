@@ -10,13 +10,15 @@ namespace StreamingBulkCopy.ConsoleClient
             Console.WriteLine("starting bulk import");
             
             var startTime = DateTime.Now;
-            //var sbk = new StreamingBulkCopy("D:\\Projects\\StreamingBulkCopy\\1000000_KitList_wout_headers.csv");
-            var sbk = new StreamingBulkCopy("D:\\Projects\\StreamingBulkCopy\\1000000_KitList_w_headers.csv");
-            var kits = sbk.GetKits();
+
+            //var sbk = new StreamingBulkCopy("D:\\Projects\\StreamingBulkCopy\\1000000_Data_w_headers.csv");
+            var sbk = new StreamingBulkCopy("D:\\Projects\\StreamingBulkCopy\\1000000_Data_wout_headers.csv");
             
-            //this is assuming headers are NOT included in the file, if they are, we should not have to specify header names
-            //var enumDataReader = new EnumerableDataReader<Kit>(kits, new[] { "Sequence", "KitNumber", "KitType" });
-            var enumDataReader = new EnumerableDataReader<Kit>(kits);
+            var data = sbk.GetData();
+            
+            //var enumDataReader = new EnumerableDataReader<Data>(data, new[] { "Field1", "Field2", "Field3" });
+            var enumDataReader = new EnumerableDataReader<Data>(data);
+            
             sbk.WriteToDatabase(enumDataReader);
 
             var endTime = DateTime.Now;

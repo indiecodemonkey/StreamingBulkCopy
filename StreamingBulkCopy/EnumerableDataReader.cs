@@ -287,21 +287,20 @@ namespace StreamingBulkCopy
             public abstract Type Type { get; }
             public abstract string Name { get; }
             public abstract object GetValue(T instance);
+            private static Dictionary<string, Func<T, object>> getterDictionary = new Dictionary<string, Func<T, object>>();
 
             protected static void AddGetter(Type classType, string fieldName, Func<T, object> getter)
             {
-                m_GetterDictionary.Add(string.Concat(classType.FullName, fieldName), getter);
+                getterDictionary.Add(string.Concat(classType.FullName, fieldName), getter);
             }
 
             protected static Func<T, object> GetGetter(Type classType, string fieldName)
             {
-                Func<T, object> getter = null;
-                if (m_GetterDictionary.TryGetValue(string.Concat(classType.FullName, fieldName), out getter))
+                Func<T, object> getter;
+                if (getterDictionary.TryGetValue(string.Concat(classType.FullName, fieldName), out getter))
                     return getter;
                 return null;
             }
-
-            private static Dictionary<string, Func<T, object>> m_GetterDictionary = new Dictionary<string, Func<T, object>>();
         }
 
         private class Property : BaseField

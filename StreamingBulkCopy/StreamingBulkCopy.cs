@@ -15,26 +15,26 @@ namespace StreamingBulkCopy
             this.importFile = importFile;
         }
 
-        public IEnumerable<Kit> GetKits()
+        public IEnumerable<Data> GetData()
         {
             //stream the file out first using LINQ
             //this method reads one line at a time, and returns an IEnumerable of string
             //it only every loads one line into memory at a time
             return File.ReadLines(importFile)
                 .Select(line => line.Split(','))
-                .Select(split => new Kit
+                .Select(split => new Data
                 {
-                    Sequence = split[0],
-                    KitNumber = split[1],
-                    KitType = split[2]
+                    Field1 = split[0],
+                    Field2 = split[1],
+                    Field3 = split[2]
                 });
         }
 
         public void WriteToDatabase(IDataReader dataReader)
         {
-            using (var bulkCopy = new SqlBulkCopy(@"Data Source=US-SO-ACT-01027\SQLEXPRESS; Initial Catalog=StreamingBulkCopy; Integrated Security=True;"))
+            using (var bulkCopy = new SqlBulkCopy(@"Data Source=(LocalDB)\MSSQLLocalDB; Initial Catalog=StreamingBulkCopy; Integrated Security=True;"))
             {
-                bulkCopy.DestinationTableName = "dbo.Kits";
+                bulkCopy.DestinationTableName = "dbo.Data";
                 bulkCopy.EnableStreaming = true;
                 bulkCopy.WriteToServer(dataReader);
             }

@@ -39,11 +39,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Microsoft\SkeletonDataReader.cs" />
+    <Compile Include="Microsoft\TemplateDataReader.cs" />
     <Compile Include="EnumerableDataReader.cs" />
-    <Compile Include="Kit.cs" />
+    <Compile Include="Data.cs" />
     <Compile Include="StreamingBulkCopy.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

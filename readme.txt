@@ -1,5 +1,5 @@
 Implmentation of a streaming bulk copy form Jimmy Bogard's NSB Con 2014 presentation: "Scaling NServiceBus" (http://fast.wistia.net/embed/iframe/y56svovwnk?popover=true)
-The EnumverableDataReader class is copyied from this StackOverflow posting: http://stackoverflow.com/questions/2258310/get-an-idatareader-from-a-typed-list
+The EnumerableDataReader class is copyied from this StackOverflow posting: http://stackoverflow.com/questions/2258310/get-an-idatareader-from-a-typed-list
 
 metrics
 =======
@@ -9,4 +9,3 @@ metrics
 todo
 ====
 - use : this() for constructors chaining on the EnumerableDataReader to get rid of duplicate constructor code
-- 
