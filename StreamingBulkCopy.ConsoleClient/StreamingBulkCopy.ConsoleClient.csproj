@@ -45,6 +45,8 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="1000000_Data_wout_headers.csv" />
+    <EmbeddedResource Include="1000000_Data_w_headers.csv" />
     <None Include="App.config">
       <SubType>Designer</SubType>
     </None>
