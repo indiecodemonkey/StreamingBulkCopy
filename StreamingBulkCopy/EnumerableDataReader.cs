@@ -14,28 +14,15 @@ namespace StreamingBulkCopy
         private bool enumeratorState;
         private readonly List<BaseField> baseFields = new List<BaseField>();
 
-        public EnumerableDataReader(IEnumerable<T> collection, params string[] fields)
+        public EnumerableDataReader(IEnumerable<T> collection, params string[] fieldNames)
         {
-            if (collection == null)
-                throw new ArgumentNullException("collection");
-
-            enumerator = collection.GetEnumerator();
-
-            if (enumerator == null)
-                throw new NullReferenceException("collection does not implement GetEnumerator");
-
-            SetFields(fields);
+            VerifyCollectionAndGetEnumerator(collection);
+            SetFields(fieldNames);
         }
 
         public EnumerableDataReader(IEnumerable<T> collection)
         {
-            if (collection == null)
-                throw new ArgumentNullException("collection");
-
-            enumerator = collection.GetEnumerator();
-
-            if (enumerator == null)
-                throw new NullReferenceException("collection does not implement GetEnumerator");
+            enumerator = VerifyCollectionAndGetEnumerator(collection);
 
             //we call this to forward the current enumerator 1 row past the headers row, so the headers are not imported
             enumeratorState = enumerator.MoveNext();
@@ -45,6 +32,19 @@ namespace StreamingBulkCopy
             var fieldNames = propertyInfoList.Select(propertyInfo => propertyInfo.Name).ToList();
 
             SetFields(fieldNames);
+        }
+
+        private IEnumerator<T> VerifyCollectionAndGetEnumerator(IEnumerable<T> collection)
+        {
+            if (collection == null)
+                throw new ArgumentNullException("collection");
+
+            enumerator = collection.GetEnumerator();
+
+            if (enumerator == null)
+                throw new NullReferenceException("collection does not implement GetEnumerator");
+
+            return enumerator;
         }
 
         private void SetFields(ICollection<string> fields)
@@ -82,7 +82,7 @@ namespace StreamingBulkCopy
                 current = default(T);
                 enumeratorState = false;
             }
-            m_Closed = true;
+            closed = true;
         }
 
         #endregion
@@ -91,10 +91,10 @@ namespace StreamingBulkCopy
 
         public void Close()
         {
-            m_Closed = true;
+            closed = true;
         }
 
-        private bool m_Closed = false;
+        private bool closed = false;
 
         public int Depth
         {
@@ -113,7 +113,7 @@ namespace StreamingBulkCopy
 
         public bool IsClosed
         {
-            get { return m_Closed; }
+            get { return closed; }
         }
 
         public bool NextResult()

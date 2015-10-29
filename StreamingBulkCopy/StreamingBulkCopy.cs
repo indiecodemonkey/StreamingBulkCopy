@@ -15,6 +15,8 @@ namespace StreamingBulkCopy
             this.importFile = importFile;
         }
 
+        //TODO: we can't use T here until we find a way to map the properties of T to the data we're trying to assign to each property of T
+        //public IEnumerable<Data> GetData<T>() where T : new()
         public IEnumerable<Data> GetData()
         {
             //stream the file out first using LINQ

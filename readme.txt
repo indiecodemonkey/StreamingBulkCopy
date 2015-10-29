@@ -8,4 +8,5 @@ metrics
 
 todo
 ====
-- use : this() for constructors chaining on the EnumerableDataReader to get rid of duplicate constructor code
+- change StreamingBulkCopy.GetData to use generics.
+	- have to find a way to map the data given to StreamingBulkCopy's contructor with the properties of T
