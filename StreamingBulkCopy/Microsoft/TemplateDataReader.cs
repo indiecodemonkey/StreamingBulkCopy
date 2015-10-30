@@ -1,4 +1,7 @@
-﻿//https://msdn.microsoft.com/en-us/library/aa720693(v=vs.71).aspx
+﻿//this is only for the skeleton of what it means to implement IDataReader
+//here is a link that Microsoft provides for implementing IDataReader: 
+//https://msdn.microsoft.com/en-us/library/5awcy9t0(v=vs.71).aspx
+//https://msdn.microsoft.com/en-us/library/aa720693(v=vs.71).aspx
 
 using System;
 using System.Data;

@@ -39,10 +39,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Microsoft\SkeletonDataReader.cs" />
     <Compile Include="Microsoft\TemplateDataReader.cs" />
     <Compile Include="EnumerableDataReader.cs" />
     <Compile Include="Data.cs" />
+    <Compile Include="NewEnumerableDataReader.cs" />
     <Compile Include="StreamingBulkCopy.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
