@@ -19,8 +19,6 @@ namespace StreamingBulkCopy
         {
             var listOfT = new List<T>();
             
-            //"When you use ReadLines, you can start enumerating the collection of strings before the whole collection is returned"
-            //foreach starts enumerating, but based on the explination above from MSDN, sounds like even though I've started enumerating, the file is still only loaded into memory one line at a time?
             var lines = File.ReadLines(importFile);
 
             var propertyInfoOfT = typeof(T).GetProperties();
@@ -40,10 +38,6 @@ namespace StreamingBulkCopy
 
             return listOfT;
         }
-
-        //find a way to execute this line:
-        //var dataReader = new EnumerableDataReader<Data>(data);
-        //in this class. That way, the dataReader is internal to the class, and does not have to be fed to the WriteToDatabase method below
 
         public IEnumerable<Data> GetData()
         {
