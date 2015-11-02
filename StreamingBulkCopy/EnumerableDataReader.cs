@@ -9,11 +9,11 @@ namespace StreamingBulkCopy
 {
     public class EnumerableDataReader<T> : IDataReader
     {
-        private readonly IEnumerable<T> items;
+        //private readonly IEnumerable<T> items;
+        private IEnumerable<T> items;
         private bool disposed;
         private IEnumerator<T> enumerator;
         private readonly Dictionary<int, PropertyInfo> ordinalToPropertyInfo = new Dictionary<int, PropertyInfo>();
-        private readonly Dictionary<PropertyInfo, int> propertyInfoToOrdinal = new Dictionary<PropertyInfo, int>();
 
         public EnumerableDataReader(IEnumerable<T> items)
         {
@@ -61,11 +61,8 @@ namespace StreamingBulkCopy
         public int GetOrdinal(string name)
         {
             this.EnsureNotDisposed();
-            //var ordinal = ordinalToPropertyInfo.FirstOrDefault(x => x.Value.Name == name).Key;
 
-            //TODO: either create a new dictionary of PropertyName/Ordinal, or test this code to see if looking up a key in dictionary by value will work
-            //since the values being populated into ordinalToPropertyInfo are coming from dto's created in StreamingBulkCopy, you can't have a single class with matching property names,
-            //that won't compile, so we should not have to worry about non-unique values in the ordinalToPropertyInfo dictionary
+            //var ordinal = ordinalToPropertyInfo.FirstOrDefault(x => x.Value.Name == name).Key;
             if (ordinalToPropertyInfo.All(x => x.Value.Name != name))
                 throw new InvalidOperationException(string.Format("Cannot get the key for value '{0}' in ordinalToPropertyInfo", name));
 
