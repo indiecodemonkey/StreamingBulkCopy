@@ -9,8 +9,7 @@ namespace StreamingBulkCopy
 {
     public class EnumerableDataReader<T> : IDataReader
     {
-        //private readonly IEnumerable<T> items;
-        private IEnumerable<T> items;
+        private readonly IEnumerable<T> items;
         private bool disposed;
         private IEnumerator<T> enumerator;
         private readonly Dictionary<int, PropertyInfo> ordinalToPropertyInfo = new Dictionary<int, PropertyInfo>();
@@ -22,7 +21,7 @@ namespace StreamingBulkCopy
 
             this.items = items;
 
-            //we're making the assumption here that the items collection passed to us is in the same order as TRsult.GetProps is going to return to us
+            //I'm making the assumption here that the items collection passed to us is in the same order as TRsult.GetProps is going to return to us
             var properties = typeof(T).GetProperties();
             var i = 0;
             foreach (var propertyInfo in properties)
@@ -32,23 +31,29 @@ namespace StreamingBulkCopy
             }
         }
 
+        private void EnsureNotDisposed()
+        {
+            if (disposed)
+                throw new ObjectDisposedException("EnumerableDataReader");
+        }
+
         #region required overrides
         public object GetValue(int i)
         {
-            this.EnsureNotDisposed();
+            EnsureNotDisposed();
 
             PropertyInfo propertyInfo;
             if(!ordinalToPropertyInfo.TryGetValue(i, out propertyInfo))
                 throw new InvalidOperationException(string.Format("Cannot GetValue for '{0}' because the key does not exist in ordinalToPropertyInfo", i));
             
-            var value = propertyInfo.GetValue(this.enumerator.Current);
+            var value = propertyInfo.GetValue(enumerator.Current);
             return value;
         }
 
         //this isn't currently being used
         public string GetName(int i)
         {
-            this.EnsureNotDisposed();
+            EnsureNotDisposed();
 
             PropertyInfo propertyInfo;
             if(!ordinalToPropertyInfo.TryGetValue(i, out propertyInfo))
@@ -60,7 +65,7 @@ namespace StreamingBulkCopy
         //this isn't currently being used
         public int GetOrdinal(string name)
         {
-            this.EnsureNotDisposed();
+            EnsureNotDisposed();
 
             //var ordinal = ordinalToPropertyInfo.FirstOrDefault(x => x.Value.Name == name).Key;
             if (ordinalToPropertyInfo.All(x => x.Value.Name != name))
@@ -74,63 +79,53 @@ namespace StreamingBulkCopy
         {
             get
             {
-                this.EnsureNotDisposed();
-                return this.ordinalToPropertyInfo.Count;
+                EnsureNotDisposed();
+                return ordinalToPropertyInfo.Count;
             }
         }
 
         public bool Read()
         {
-            this.EnsureNotDisposed();
+            EnsureNotDisposed();
 
-            if (null == this.enumerator)
-            {
-                this.enumerator = this.items.GetEnumerator();
-            }
+            if (null == enumerator)
+                enumerator = items.GetEnumerator();
 
-            return this.enumerator.MoveNext();
+            return enumerator.MoveNext();
         }
 
         public bool IsDBNull(int i)
         {
-            this.EnsureNotDisposed();
+            EnsureNotDisposed();
 
-            object value = this.GetValue(i);
+            object value = GetValue(i);
             return (null == value);
         }
 
         public void Dispose()
         {
-            if (null != this.enumerator)
+            if (null != enumerator)
             {
-                this.enumerator.Dispose();
-                this.enumerator = null;
+                enumerator.Dispose();
+                enumerator = null;
             }
 
-            this.disposed = true;
+            disposed = true;
         }
 
         public void Close()
         {
-            this.Dispose();
+            Dispose();
         }
         #endregion
-
-        private void EnsureNotDisposed()
-        {
-            if (this.disposed)
-            {
-                throw new ObjectDisposedException("EnumerableDataReader");
-            }
-        }
 
         //this is not currently being used. It is not used by bulk-writer either
         public T Current
         {
             get
             {
-                this.EnsureNotDisposed();
-                return (null != this.enumerator) ? this.enumerator.Current : default(T);
+                EnsureNotDisposed();
+                return (null != enumerator) ? enumerator.Current : default(T);
             }
         }
 
