@@ -15,10 +15,10 @@ namespace StreamingBulkCopy
             this.importFile = importFile;
         }
 
+        //using this, it takes about 11 seconds
         public IEnumerable<T> BuildDtosFromDataInImportFile()
         {
             var listOfT = new List<T>();
-            
             var lines = File.ReadLines(importFile);
 
             var propertyInfoOfT = typeof(T).GetProperties();
@@ -39,6 +39,7 @@ namespace StreamingBulkCopy
             return listOfT;
         }
 
+        //using this, it takes about 8 seconds
         public IEnumerable<Data> GetData()
         {
             //stream the file out first using LINQ

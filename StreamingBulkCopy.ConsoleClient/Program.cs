@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 
 namespace StreamingBulkCopy.ConsoleClient
 {
@@ -20,19 +18,12 @@ namespace StreamingBulkCopy.ConsoleClient
 
             //var dataReader = new EnumerableDataReader<Data>(data);
             var dataReader = new NewEnumerableDataReader<Data>(data);
-            //var dataReader = new EnumerableDataReader<Data>(data, new[] { "Field1", "Field2", "Field3" });
-
+           
             sbk.WriteToDatabase(dataReader);
             
             Console.WriteLine("bulk import finished in: {0} seconds", (DateTime.Now - startTime).TotalSeconds);
             Console.ReadLine();
         }
-
-        //var watch = new Stopwatch();
-        //watch.Start();
-        //do operation here
-        //watch.Stop();
-        //Console.WriteLine(watch.ElapsedMilliseconds);
     }
 }
 

@@ -7,15 +7,14 @@ using System.Reflection;
 
 namespace StreamingBulkCopy
 {
-    public class NewEnumerableDataReader<TResult> : IDataReader
+    public class NewEnumerableDataReader<T> : IDataReader
     {
-        private readonly IEnumerable<TResult> items;
-        //private readonly PropertyMapping[] propertyMappings;
+        private readonly IEnumerable<T> items;
         private bool disposed;
-        private IEnumerator<TResult> enumerator;
+        private IEnumerator<T> enumerator;
         private readonly Dictionary<int, PropertyInfo> ordinalToPropertyInfo = new Dictionary<int, PropertyInfo>();
 
-        public NewEnumerableDataReader(IEnumerable<TResult> items)
+        public NewEnumerableDataReader(IEnumerable<T> items)
         {
             if (null == items)
                 throw new ArgumentNullException("items");
@@ -23,7 +22,7 @@ namespace StreamingBulkCopy
             this.items = items;
 
             //we're making the assumption here that the items collection passed to us is in the same order as TRsult.GetProps is going to return to us
-            var properties = typeof(TResult).GetProperties();
+            var properties = typeof(T).GetProperties();
             var i = 0;
             foreach (var property in properties)
             {
@@ -32,29 +31,40 @@ namespace StreamingBulkCopy
             }
         }
 
-        //need to be able to get the ordinal by the field name?
-        public int GetOrdinal(string name)
-        {
-            this.EnsureNotDisposed();
-            var ordinal = ordinalToPropertyInfo.FirstOrDefault(x => x.Value.Name == name).Key;
-            return ordinal;
-        }
-
         public object GetValue(int i)
         {
             this.EnsureNotDisposed();
             PropertyInfo propertyInfo;
-            ordinalToPropertyInfo.TryGetValue(0, out propertyInfo);
+            if(!ordinalToPropertyInfo.TryGetValue(i, out propertyInfo))
+                throw new InvalidOperationException(string.Format("Cannot GetValue for '{0}' because the key does not exist in ordinalToPropertyInfo", i));
             var value = propertyInfo.GetValue(this.enumerator.Current);
             return value;
         }
 
+        //this icsn't currently being used
         public string GetName(int i)
         {
             this.EnsureNotDisposed();
             PropertyInfo propertyInfo;
-            ordinalToPropertyInfo.TryGetValue(i, out propertyInfo);
+            if(!ordinalToPropertyInfo.TryGetValue(i, out propertyInfo))
+                throw new InvalidOperationException(string.Format("Cannot GetName for '{0}' because the key does not exist in ordinalToPropertyInfo", i));
             return propertyInfo.Name;
+        }
+
+        //this isn't currently being used
+        public int GetOrdinal(string name)
+        {
+            this.EnsureNotDisposed();
+            //var ordinal = ordinalToPropertyInfo.FirstOrDefault(x => x.Value.Name == name).Key;
+
+            //TODO: either create a new dictionary of PropertyName/Ordinal, or test this code to see if looking up a key in dictionary by value will work
+            //since the values being populated into ordinalToPropertyInfo are coming from dto's created in StreamingBulkCopy, you can't have a single class with matching property names,
+            //that won't compile, so we should not have to worry about non-unique values in the ordinalToPropertyInfo dictionary
+            if (ordinalToPropertyInfo.All(x => x.Value.Name != name))
+                throw new InvalidOperationException(string.Format("Cannot get the key for value '{0}' in ordinalToPropertyInfo", name));
+
+            var ordinal = ordinalToPropertyInfo.First(x => x.Value.Name == name).Key;
+            return ordinal;
         }
 
         public int FieldCount
@@ -62,17 +72,16 @@ namespace StreamingBulkCopy
             get
             {
                 this.EnsureNotDisposed();
-                //return this.propertyMappings.Length; //this returns 3 on the bulk-writer examples
                 return this.ordinalToPropertyInfo.Count;
             }
         }
 
-        public TResult Current
+        public T Current
         {
             get
             {
                 this.EnsureNotDisposed();
-                return (null != this.enumerator) ? this.enumerator.Current : default(TResult);
+                return (null != this.enumerator) ? this.enumerator.Current : default(T);
             }
         }
 
@@ -120,7 +129,7 @@ namespace StreamingBulkCopy
             }
         }
 
-        #region Not used by NewEnumerableDataReader
+        #region not used
 
         public string GetDataTypeName(int i)
         {

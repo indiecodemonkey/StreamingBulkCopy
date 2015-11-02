@@ -7,10 +7,18 @@
 
 benchmarks
 ==========
+
 GetData
 -------
 - for import file w/out headers, one million inserts in 8.740 seconds
 
-GetData<T> (uses reflection)
-----------
+BuildDtosFromDataInImportFile (uses reflection)
+-----------------------------
 - for import file w/out headers, one million inserts in 11.453 seconds
+
+EnumerableDataReader vs. NewEnumerableDataReader (using BuildDtosFromDataInImportFile as way to get data)
+------------------------------------------------
+EnumerableDataReader
+	- 11.048 seconds
+NewEnumerableDataReader
+	- 11.175 seconds
