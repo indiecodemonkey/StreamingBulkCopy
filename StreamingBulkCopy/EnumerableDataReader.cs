@@ -1,269 +1,175 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 
 namespace StreamingBulkCopy
 {
     public class EnumerableDataReader<T> : IDataReader
     {
+        private readonly IEnumerable<T> items;
+        private bool disposed;
         private IEnumerator<T> enumerator;
-        private T current;
-        private bool enumeratorState;
-        private readonly List<BaseField> baseFields = new List<BaseField>();
+        private readonly Dictionary<int, PropertyInfo> ordinalToPropertyInfo = new Dictionary<int, PropertyInfo>();
+        private readonly Dictionary<PropertyInfo, int> propertyInfoToOrdinal = new Dictionary<PropertyInfo, int>();
 
-        public EnumerableDataReader(IEnumerable<T> collection, params string[] fieldNames)
+        public EnumerableDataReader(IEnumerable<T> items)
         {
-            VerifyCollectionAndGetEnumerator(collection);
-            SetFields(fieldNames);
-        }
+            if (null == items)
+                throw new ArgumentNullException("items");
 
-        public EnumerableDataReader(IEnumerable<T> collection)
-        {
-            enumerator = VerifyCollectionAndGetEnumerator(collection);
+            this.items = items;
 
-            //we call this to forward the current enumerator 1 row past the headers row, so the headers are not imported
-            enumeratorState = enumerator.MoveNext();
-
-            var typeInfo = typeof(T).GetTypeInfo();
-            var propertyInfoList = typeInfo.DeclaredProperties;
-            var fieldNames = propertyInfoList.Select(propertyInfo => propertyInfo.Name).ToList();
-
-            SetFields(fieldNames);
-        }
-
-        private IEnumerator<T> VerifyCollectionAndGetEnumerator(IEnumerable<T> collection)
-        {
-            if (collection == null)
-                throw new ArgumentNullException("collection");
-
-            enumerator = collection.GetEnumerator();
-
-            if (enumerator == null)
-                throw new NullReferenceException("collection does not implement GetEnumerator");
-
-            return enumerator;
-        }
-
-        private void SetFields(ICollection<string> fields)
-        {
-            if (fields.Count > 0)
+            //we're making the assumption here that the items collection passed to us is in the same order as TRsult.GetProps is going to return to us
+            var properties = typeof(T).GetProperties();
+            var i = 0;
+            foreach (var propertyInfo in properties)
             {
-                var type = typeof(T);
-                foreach (var field in fields)
-                {
-                    var properyInfo = type.GetProperty(field);
-                    if (properyInfo != null)
-                        this.baseFields.Add(new Property(properyInfo));
-                    else
-                    {
-                        var fieldInfo = type.GetField(field);
-                        if (fieldInfo != null)
-                            this.baseFields.Add(new Field(fieldInfo));
-                        else
-                            throw new NullReferenceException(string.Format("EnumerableDataReader<T>: Missing property or field '{0}' in Type '{1}'.", field, type.Name));
-                    }
-                }
+                ordinalToPropertyInfo.Add(i, propertyInfo);
+                i++;
             }
-            else
-                this.baseFields.Add(new Self());
         }
 
-        #region IDisposable Members
-
-        public void Dispose()
+        #region required overrides
+        public object GetValue(int i)
         {
-            if (enumerator != null)
+            this.EnsureNotDisposed();
+
+            PropertyInfo propertyInfo;
+            if(!ordinalToPropertyInfo.TryGetValue(i, out propertyInfo))
+                throw new InvalidOperationException(string.Format("Cannot GetValue for '{0}' because the key does not exist in ordinalToPropertyInfo", i));
+            
+            var value = propertyInfo.GetValue(this.enumerator.Current);
+            return value;
+        }
+
+        //this isn't currently being used
+        public string GetName(int i)
+        {
+            this.EnsureNotDisposed();
+
+            PropertyInfo propertyInfo;
+            if(!ordinalToPropertyInfo.TryGetValue(i, out propertyInfo))
+                throw new InvalidOperationException(string.Format("Cannot GetName for '{0}' because the key does not exist in ordinalToPropertyInfo", i));
+            
+            return propertyInfo.Name;
+        }
+
+        //this isn't currently being used
+        public int GetOrdinal(string name)
+        {
+            this.EnsureNotDisposed();
+            //var ordinal = ordinalToPropertyInfo.FirstOrDefault(x => x.Value.Name == name).Key;
+
+            //TODO: either create a new dictionary of PropertyName/Ordinal, or test this code to see if looking up a key in dictionary by value will work
+            //since the values being populated into ordinalToPropertyInfo are coming from dto's created in StreamingBulkCopy, you can't have a single class with matching property names,
+            //that won't compile, so we should not have to worry about non-unique values in the ordinalToPropertyInfo dictionary
+            if (ordinalToPropertyInfo.All(x => x.Value.Name != name))
+                throw new InvalidOperationException(string.Format("Cannot get the key for value '{0}' in ordinalToPropertyInfo", name));
+
+            var ordinal = ordinalToPropertyInfo.First(x => x.Value.Name == name).Key;
+            return ordinal;
+        }
+
+        public int FieldCount
+        {
+            get
             {
-                enumerator.Dispose();
-                enumerator = null;
-                current = default(T);
-                enumeratorState = false;
+                this.EnsureNotDisposed();
+                return this.ordinalToPropertyInfo.Count;
             }
-            closed = true;
-        }
-
-        #endregion
-
-        #region IDataReader Members
-
-        public void Close()
-        {
-            closed = true;
-        }
-
-        private bool closed = false;
-
-        public int Depth
-        {
-            get { return 0; }
-        }
-
-        public DataTable GetSchemaTable()
-        {
-            var dt = new DataTable();
-            foreach (var field in baseFields)
-            {
-                dt.Columns.Add(new DataColumn(field.Name, field.Type));
-            }
-            return dt;
-        }
-
-        public bool IsClosed
-        {
-            get { return closed; }
-        }
-
-        public bool NextResult()
-        {
-            return false;
         }
 
         public bool Read()
         {
-            if (IsClosed)
-                throw new InvalidOperationException("DataReader is closed");
-            enumeratorState = enumerator.MoveNext();
-            current = enumeratorState ? enumerator.Current : default(T);
-            return enumeratorState;
-        }
+            this.EnsureNotDisposed();
 
-        public int RecordsAffected
-        {
-            get { return -1; }
-        }
+            if (null == this.enumerator)
+            {
+                this.enumerator = this.items.GetEnumerator();
+            }
 
-        #endregion
-
-        #region IDataRecord Members
-
-        public int FieldCount
-        {
-            get { return baseFields.Count; }
-        }
-
-        public Type GetFieldType(int i)
-        {
-            if (i < 0 || i >= baseFields.Count)
-                throw new IndexOutOfRangeException();
-            return baseFields[i].Type;
-        }
-
-        public string GetDataTypeName(int i)
-        {
-            return GetFieldType(i).Name;
-        }
-
-        public string GetName(int i)
-        {
-            if (i < 0 || i >= baseFields.Count)
-                throw new IndexOutOfRangeException();
-            return baseFields[i].Name;
-        }
-
-        public int GetOrdinal(string name)
-        {
-            for (int i = 0; i < baseFields.Count; i++)
-                if (baseFields[i].Name == name)
-                    return i;
-            throw new IndexOutOfRangeException("name");
+            return this.enumerator.MoveNext();
         }
 
         public bool IsDBNull(int i)
         {
-            return GetValue(i) == null;
+            this.EnsureNotDisposed();
+
+            object value = this.GetValue(i);
+            return (null == value);
         }
 
-        public object this[string name]
+        public void Dispose()
         {
-            get { return GetValue(GetOrdinal(name)); }
+            if (null != this.enumerator)
+            {
+                this.enumerator.Dispose();
+                this.enumerator = null;
+            }
+
+            this.disposed = true;
         }
 
-        public object this[int i]
+        public void Close()
         {
-            get { return GetValue(i); }
+            this.Dispose();
+        }
+        #endregion
+
+        private void EnsureNotDisposed()
+        {
+            if (this.disposed)
+            {
+                throw new ObjectDisposedException("EnumerableDataReader");
+            }
         }
 
-        public object GetValue(int i)
+        //this is not currently being used. It is not used by bulk-writer either
+        public T Current
         {
-            if (IsClosed || !enumeratorState)
-                throw new InvalidOperationException("DataReader is closed or has reached the end of the enumerator");
-            if (i < 0 || i >= baseFields.Count)
-                throw new IndexOutOfRangeException();
-            return baseFields[i].GetValue(current);
+            get
+            {
+                this.EnsureNotDisposed();
+                return (null != this.enumerator) ? this.enumerator.Current : default(T);
+            }
+        }
+
+        #region not used
+
+        public string GetDataTypeName(int i)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Type GetFieldType(int i)
+        {
+            throw new NotSupportedException();
         }
 
         public int GetValues(object[] values)
         {
-            int length = Math.Min(baseFields.Count, values.Length);
-            for (int i = 0; i < length; i++)
-                values[i] = GetValue(i);
-            return length;
+            throw new NotSupportedException();
         }
 
         public bool GetBoolean(int i)
         {
-            return (bool)GetValue(i);
+            throw new NotSupportedException();
         }
 
         public byte GetByte(int i)
         {
-            return (byte)GetValue(i);
-        }
-
-        public char GetChar(int i)
-        {
-            return (char)GetValue(i);
-        }
-
-        public DateTime GetDateTime(int i)
-        {
-            return (DateTime)GetValue(i);
-        }
-
-        public decimal GetDecimal(int i)
-        {
-            return (decimal)GetValue(i);
-        }
-
-        public double GetDouble(int i)
-        {
-            return (double)GetValue(i);
-        }
-
-        public float GetFloat(int i)
-        {
-            return (float)GetValue(i);
-        }
-
-        public Guid GetGuid(int i)
-        {
-            return (Guid)GetValue(i);
-        }
-
-        public short GetInt16(int i)
-        {
-            return (short)GetValue(i);
-        }
-
-        public int GetInt32(int i)
-        {
-            return (int)GetValue(i);
-        }
-
-        public long GetInt64(int i)
-        {
-            return (long)GetValue(i);
-        }
-
-        public string GetString(int i)
-        {
-            return (string)GetValue(i);
+            throw new NotSupportedException();
         }
 
         public long GetBytes(int i, long fieldOffset, byte[] buffer, int bufferoffset, int length)
+        {
+            throw new NotSupportedException();
+        }
+
+        public char GetChar(int i)
         {
             throw new NotSupportedException();
         }
@@ -273,150 +179,94 @@ namespace StreamingBulkCopy
             throw new NotSupportedException();
         }
 
+        public Guid GetGuid(int i)
+        {
+            throw new NotSupportedException();
+        }
+
+        public short GetInt16(int i)
+        {
+            throw new NotSupportedException();
+        }
+
+        public int GetInt32(int i)
+        {
+            throw new NotSupportedException();
+        }
+
+        public long GetInt64(int i)
+        {
+            throw new NotSupportedException();
+        }
+
+        public float GetFloat(int i)
+        {
+            throw new NotSupportedException();
+        }
+
+        public double GetDouble(int i)
+        {
+            throw new NotSupportedException();
+        }
+
+        public string GetString(int i)
+        {
+            throw new NotSupportedException();
+        }
+
+        public decimal GetDecimal(int i)
+        {
+            throw new NotSupportedException();
+        }
+
+        public DateTime GetDateTime(int i)
+        {
+            throw new NotSupportedException();
+        }
+
         public IDataReader GetData(int i)
         {
             throw new NotSupportedException();
         }
 
-        #endregion
-
-        #region Helper Classes
-
-        private abstract class BaseField
+        object IDataRecord.this[int i]
         {
-            public abstract Type Type { get; }
-            public abstract string Name { get; }
-            public abstract object GetValue(T instance);
-            private static Dictionary<string, Func<T, object>> getterDictionary = new Dictionary<string, Func<T, object>>();
-
-            protected static void AddGetter(Type classType, string fieldName, Func<T, object> getter)
-            {
-                getterDictionary.Add(string.Concat(classType.FullName, fieldName), getter);
-            }
-
-            protected static Func<T, object> GetGetter(Type classType, string fieldName)
-            {
-                Func<T, object> getter;
-                if (getterDictionary.TryGetValue(string.Concat(classType.FullName, fieldName), out getter))
-                    return getter;
-                return null;
-            }
+            get { throw new NotSupportedException(); }
         }
 
-        private class Property : BaseField
+        object IDataRecord.this[string name]
         {
-            private readonly PropertyInfo propertyInfo;
-            private readonly Func<T, object> dynamicGetter;
-
-            public Property(PropertyInfo info)
-            {
-                propertyInfo = info;
-                dynamicGetter = CreateGetMethod(info);
-            }
-
-            public override Type Type
-            {
-                get { return propertyInfo.PropertyType; }
-            }
-
-            public override string Name
-            {
-                get { return propertyInfo.Name; }
-            }
-
-            public override object GetValue(T instance)
-            {
-                //return m_Info.GetValue(instance, null); // Reflection is slow
-                return dynamicGetter(instance);
-            }
-
-            // Create dynamic method for faster access instead via reflection
-            private Func<T, object> CreateGetMethod(PropertyInfo propertyInfo)
-            {
-                Type classType = typeof(T);
-                Func<T, object> dynamicGetter = GetGetter(classType, propertyInfo.Name);
-                if (dynamicGetter == null)
-                {
-                    ParameterExpression instance = Expression.Parameter(classType);
-                    MemberExpression property = Expression.Property(instance, propertyInfo);
-                    UnaryExpression convert = Expression.Convert(property, typeof(object));
-                    dynamicGetter = (Func<T, object>)Expression.Lambda(convert, instance).Compile();
-                    AddGetter(classType, propertyInfo.Name, dynamicGetter);
-                }
-
-                return dynamicGetter;
-            }
+            get { throw new NotSupportedException(); }
         }
 
-        private class Field : BaseField
+        public DataTable GetSchemaTable()
         {
-            private readonly FieldInfo fieldInfo;
-            private readonly Func<T, object> dynamicGetter;
-
-            public Field(FieldInfo info)
-            {
-                fieldInfo = info;
-                dynamicGetter = CreateGetMethod(info);
-            }
-
-            public override Type Type
-            {
-                get { return fieldInfo.FieldType; }
-            }
-
-            public override string Name
-            {
-                get { return fieldInfo.Name; }
-            }
-
-            public override object GetValue(T instance)
-            {
-                //return m_Info.GetValue(instance); // Reflection is slow
-                return dynamicGetter(instance);
-            }
-
-            // Create dynamic method for faster access instead via reflection
-            private Func<T, object> CreateGetMethod(FieldInfo fieldInfo)
-            {
-                Type classType = typeof(T);
-                Func<T, object> dynamicGetter = GetGetter(classType, fieldInfo.Name);
-                if (dynamicGetter == null)
-                {
-                    ParameterExpression instance = Expression.Parameter(classType);
-                    MemberExpression property = Expression.Field(instance, fieldInfo);
-                    UnaryExpression convert = Expression.Convert(property, typeof(object));
-                    dynamicGetter = (Func<T, object>)Expression.Lambda(convert, instance).Compile();
-                    AddGetter(classType, fieldInfo.Name, dynamicGetter);
-                }
-
-                return dynamicGetter;
-            }
+            throw new NotSupportedException();
         }
 
-        private class Self : BaseField
+        public bool NextResult()
         {
-            private readonly Type type;
-
-            public Self()
-            {
-                type = typeof(T);
-            }
-
-            public override Type Type
-            {
-                get { return type; }
-            }
-
-            public override string Name
-            {
-                get { return string.Empty; }
-            }
-
-            public override object GetValue(T instance)
-            {
-                return instance;
-            }
+            throw new NotSupportedException();
         }
+
+        [SuppressMessage("Microsoft.Design", "CA1065:DoNotRaiseExceptionsInUnexpectedLocations")]
+        public int Depth
+        {
+            get { throw new NotSupportedException(); }
+        }
+
+        [SuppressMessage("Microsoft.Design", "CA1065:DoNotRaiseExceptionsInUnexpectedLocations")]
+        public bool IsClosed
+        {
+            get { throw new NotSupportedException(); }
+        }
+
+        [SuppressMessage("Microsoft.Design", "CA1065:DoNotRaiseExceptionsInUnexpectedLocations")]
+        public int RecordsAffected
+        {
+            get { throw new NotSupportedException(); }
+        }
+
         #endregion
     }
 }

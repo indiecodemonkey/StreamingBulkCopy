@@ -17,7 +17,7 @@ namespace StreamingBulkCopy.ConsoleClient
             var data = sbk.BuildDtosFromDataInImportFile();
 
             //var dataReader = new EnumerableDataReader<Data>(data);
-            var dataReader = new NewEnumerableDataReader<Data>(data);
+            var dataReader = new EnumerableDataReader<Data>(data);
            
             sbk.WriteToDatabase(dataReader);
             
