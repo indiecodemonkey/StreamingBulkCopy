@@ -13,6 +13,9 @@ namespace StreamingBulkCopy
         private T current;
         private bool enumeratorState;
         private readonly List<BaseField> baseFields = new List<BaseField>();
+        
+        private readonly Dictionary<int, PropertyInfo> mikeOrdinalToPropertyInfo = new Dictionary<int, PropertyInfo>();
+        private bool disposed;
 
         public EnumerableDataReader(IEnumerable<T> collection, params string[] fieldNames)
         {
@@ -23,8 +26,7 @@ namespace StreamingBulkCopy
         public EnumerableDataReader(IEnumerable<T> collection)
         {
             enumerator = VerifyCollectionAndGetEnumerator(collection);
-
-            //we call this to forward the current enumerator 1 row past the headers row, so the headers are not imported
+            //engage the enumerator
             enumeratorState = enumerator.MoveNext();
 
             var typeInfo = typeof(T).GetTypeInfo();
@@ -32,6 +34,15 @@ namespace StreamingBulkCopy
             var fieldNames = propertyInfoList.Select(propertyInfo => propertyInfo.Name).ToList();
 
             SetFields(fieldNames);
+        }
+
+        public T Current
+        {
+            get
+            {
+                this.EnsureNotDisposed();
+                return (null != this.enumerator) ? this.enumerator.Current : default(T);
+            }
         }
 
         private IEnumerator<T> VerifyCollectionAndGetEnumerator(IEnumerable<T> collection)
@@ -71,19 +82,38 @@ namespace StreamingBulkCopy
                 this.baseFields.Add(new Self());
         }
 
+        private void EnsureNotDisposed()
+        {
+            if (this.disposed)
+            {
+                throw new ObjectDisposedException("EnumerableDataReader");
+            }
+        }
+
         #region IDisposable Members
 
         public void Dispose()
         {
-            if (enumerator != null)
+            if (null != this.enumerator)
             {
-                enumerator.Dispose();
-                enumerator = null;
-                current = default(T);
-                enumeratorState = false;
+                this.enumerator.Dispose();
+                this.enumerator = null;
             }
-            closed = true;
+
+            this.disposed = true;
         }
+        //original
+        //public void Dispose()
+        //{
+        //    if (enumerator != null)
+        //    {
+        //        enumerator.Dispose();
+        //        enumerator = null;
+        //        current = default(T);
+        //        enumeratorState = false;
+        //    }
+        //    closed = true;
+        //}
 
         #endregion
 
